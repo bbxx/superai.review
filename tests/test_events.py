@@ -1,4 +1,4 @@
-from datetime import timezone
+from datetime import UTC
 from uuid import uuid4
 
 import pytest
@@ -14,7 +14,7 @@ def test_event_has_version_id_session_and_utc_timestamp() -> None:
     assert event.schema_version == "1"
     assert event.event_id
     assert event.session_id == session_id
-    assert event.timestamp.utcoffset() == timezone.utc.utcoffset(event.timestamp)
+    assert event.timestamp.utcoffset() == UTC.utcoffset(event.timestamp)
 
 
 @pytest.mark.parametrize(
