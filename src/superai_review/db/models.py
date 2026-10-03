@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from superai_review.db.base import Base
+from superai_review.documents.types import ExtractionState
 from superai_review.domain.states import ReviewState
 
 
@@ -82,6 +83,9 @@ class ReviewSession(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner: Mapped[User] = relationship(back_populates="sessions")
+    documents: Mapped[list["Document"]] = relationship(
+        back_populates="session", cascade="all, delete-orphan"
+    )
     participants: Mapped[list["Participant"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
@@ -91,6 +95,52 @@ class ReviewSession(Base):
     events: Mapped[list["EventRecord"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    session_id: Mapped[str] = mapped_column(
+        ForeignKey("review_sessions.id", ondelete="CASCADE"), index=True
+    )
+    original_name: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(120))
+    size: Mapped[int] = mapped_column(Integer)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    storage_key: Mapped[str] = mapped_column(String(80), unique=True)
+    extraction_state: Mapped[str] = mapped_column(
+        String(32), default=ExtractionState.STORED.value, index=True
+    )
+    page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ocr_used: Mapped[bool] = mapped_column(Boolean, default=False)
+    error_code: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    session: Mapped[ReviewSession] = relationship(back_populates="documents")
+    segments: Mapped[list["DocumentSegment"]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="DocumentSegment.ordinal",
+    )
+
+
+class DocumentSegment(Base):
+    __tablename__ = "document_segments"
+    __table_args__ = (
+        UniqueConstraint("document_id", "ordinal", name="uq_document_segments_document_ordinal"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    document_id: Mapped[str] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    ordinal: Mapped[int] = mapped_column(Integer)
+    page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    text: Mapped[str] = mapped_column(Text)
+
+    document: Mapped[Document] = relationship(back_populates="segments")
 
 
 class Participant(Base):
