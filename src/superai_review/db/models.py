@@ -1,8 +1,8 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from superai_review.db.base import Base
@@ -14,7 +14,7 @@ def _uuid() -> str:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class ReviewSession(Base):
@@ -80,7 +80,7 @@ class ProviderRun(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
-    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal("0"))
+    estimated_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=Decimal(0))
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     provider_request_id: Mapped[str | None] = mapped_column(String(240), nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
