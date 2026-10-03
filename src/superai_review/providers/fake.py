@@ -1,9 +1,12 @@
 from collections import defaultdict
+from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID
 
 from superai_review.providers.base import (
     ModelProvider,
+    ProviderCapabilities,
+    ProviderCostEstimate,
     ProviderInvalidOutputError,
     ProviderRateLimitError,
     ProviderRequest,
@@ -25,10 +28,7 @@ class FakeScenario(StrEnum):
 
 
 class FakeProvider(ModelProvider):
-    """Deterministic provider used by unit/integration tests.
-
-    It never performs network I/O and deliberately shares the real provider contract.
-    """
+    """Deterministic provider used by unit/integration tests."""
 
     def __init__(
         self,
@@ -36,10 +36,17 @@ class FakeProvider(ModelProvider):
         *,
         provider_id: str = "fake",
         model_id: str = "fake-v1",
+        supports_structured_output: bool = True,
     ) -> None:
         self._scenario = scenario
         self._provider_id = provider_id
         self._model_id = model_id
+        self._capabilities = ProviderCapabilities(
+            max_context_tokens=32768,
+            supports_images=True,
+            supports_structured_output=supports_structured_output,
+            supports_cancellation=True,
+        )
         self._attempts: defaultdict[UUID, int] = defaultdict(int)
         self._cancelled: set[UUID] = set()
 
@@ -50,6 +57,18 @@ class FakeProvider(ModelProvider):
     @property
     def model_id(self) -> str:
         return self._model_id
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        return self._capabilities
+
+    def estimate_cost(self, request: ProviderRequest) -> ProviderCostEstimate:
+        del request
+        return ProviderCostEstimate(
+            estimated_input=Decimal(0),
+            estimated_output=Decimal(0),
+            estimated_total=Decimal(0),
+        )
 
     async def run(self, request: ProviderRequest) -> ProviderResult:
         self._attempts[request.request_id] += 1
@@ -69,17 +88,7 @@ class FakeProvider(ModelProvider):
         if self._scenario is FakeScenario.RETRY_THEN_SUCCESS and attempt == 1:
             raise ProviderRateLimitError("deterministic first-attempt rate limit")
 
-        output = {
-            "scenario": self._scenario.value,
-            "role": request.role,
-            "stage": request.stage,
-            "summary": "Deterministic fake response",
-            "position": (
-                "contradicts-default"
-                if self._scenario is FakeScenario.CONTRADICTORY
-                else "supports-default"
-            ),
-        }
+        output = self._output(request)
         return ProviderResult(
             provider=self.provider_id,
             model=self.model_id,
@@ -97,3 +106,62 @@ class FakeProvider(ModelProvider):
     async def cancel(self, request_id: UUID) -> bool:
         self._cancelled.add(request_id)
         return True
+
+    def _output(self, request: ProviderRequest) -> dict:
+        contradictory = self._scenario is FakeScenario.CONTRADICTORY
+        if request.response_schema == "proposal-output/v1":
+            return {
+                "schema_version": "proposal-output/v1",
+                "proposal_id": f"fake-{request.role}",
+                "role": request.role,
+                "summary": "Deterministic fake response",
+                "recommended_solution": "Alternative" if contradictory else "Default",
+                "reasoning_summary": "Deterministic public rationale.",
+                "key_claims": ["contradicts-default" if contradictory else "supports-default"],
+                "evidence_refs": [],
+                "assumptions": [],
+                "risks": [],
+                "uncertainties": [],
+                "suggested_next_steps": [],
+                "confidence": 0.5,
+            }
+        if request.response_schema == "cross-review/v1":
+            return {
+                "schema_version": "cross-review/v1",
+                "review_id": "fake-review",
+                "reviewer_role": request.role,
+                "target_proposal_id": "proposal-a",
+                "verdict": "APPROVE",
+                "strengths": [],
+                "issues": [],
+                "unsupported_claims": [],
+                "missing_points": [],
+                "evidence_disagreements": [],
+                "recommended_changes": [],
+                "severity_summary": "INFO",
+            }
+        if request.response_schema == "debate-response/v1":
+            return {
+                "schema_version": "debate-response/v1",
+                "topic_id": "topic-1",
+                "participant_role": request.role,
+                "position": "No material disagreement.",
+                "reasoning_summary": "Deterministic public rationale.",
+                "evidence_refs": [],
+                "changed_position": False,
+                "unresolved_points": [],
+            }
+        if request.response_schema == "final-synthesis/v1":
+            return {
+                "schema_version": "final-synthesis/v1",
+                "final_answer": "Deterministic final answer.",
+                "executive_summary": "Summary.",
+                "why_this_answer": [],
+                "key_evidence": [],
+                "rejected_or_avoided_points": [],
+                "remaining_uncertainties": [],
+                "recommended_next_steps": [],
+                "consensus_summary": "Deterministic consensus.",
+                "quality_flags": [],
+            }
+        raise ProviderInvalidOutputError("unknown fake response schema")
