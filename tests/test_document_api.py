@@ -116,3 +116,11 @@ def test_owner_can_upload_and_list_text_document(db: Session) -> None:
     listed = client.get(f"/api/reviews/{review.id}/documents", headers=headers)
     assert listed.status_code == 200
     assert [item["id"] for item in listed.json()] == [body["id"]]
+
+    evidence = client.get(
+        f"/api/reviews/{review.id}/documents/{body['id']}/evidence",
+        headers=headers,
+    )
+    assert evidence.status_code == 200
+    assert evidence.json()[0]["text"] == "hello document"
+    assert evidence.json()[0]["content_hash"]
