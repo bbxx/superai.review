@@ -50,8 +50,6 @@ def _worker(
         queue.put(("ok", result.model_dump(mode="json")))
     except DocumentError as exc:
         queue.put(("error", exc.__class__.__name__, str(exc)))
-    except Exception:
-        queue.put(("error", ExtractionFailedError.__name__, "isolated extraction failed"))
 
 
 class ProcessExtractionRunner:
