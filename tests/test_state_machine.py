@@ -20,7 +20,7 @@ def test_happy_path_accepts_canonical_transitions() -> None:
         ReviewState.SYNTHESIZING,
         ReviewState.COMPLETED,
     ]
-    for current, target in zip(path, path[1:], strict=True):
+    for current, target in zip(path, path[1:]):
         validate_transition(current, target)
 
 
