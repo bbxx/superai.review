@@ -1,5 +1,5 @@
-from io import BytesIO
 from collections.abc import Iterator
+from io import BytesIO
 
 from docx import Document as DocxDocument
 from docx.document import Document as DocxDocumentType
