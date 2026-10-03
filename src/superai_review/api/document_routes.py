@@ -5,6 +5,7 @@ from starlette.concurrency import run_in_threadpool
 
 from superai_review.api.dependencies import CurrentUserDependency
 from superai_review.api.document_dependencies import DocumentServiceDependency
+from superai_review.api.evidence_dependencies import EvidenceServiceDependency
 from superai_review.auth.ownership import ResourceNotFoundError
 from superai_review.config import get_settings
 from superai_review.documents.errors import (
@@ -20,6 +21,8 @@ from superai_review.documents.errors import (
     UnsupportedDocumentError,
 )
 from superai_review.documents.schemas import DocumentView
+from superai_review.evidence.errors import EvidenceUnavailableError
+from superai_review.evidence.schemas import EvidenceView
 
 router = APIRouter(prefix="/api/reviews/{session_id}/documents", tags=["documents"])
 
@@ -47,7 +50,7 @@ def _http_error(exc: Exception) -> HTTPException:
     if isinstance(exc, ExtractionTimeoutError):
         return HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=exc.code)
     if isinstance(exc, ResourceNotFoundError):
-        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="review session not found")
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="resource not found")
     return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="document_error")
 
 
@@ -100,3 +103,25 @@ def list_documents(
     except ResourceNotFoundError as exc:
         raise _http_error(exc) from exc
     return [DocumentView.from_model(document) for document in documents]
+
+
+@router.get("/{document_id}/evidence", response_model=list[EvidenceView])
+def document_evidence(
+    session_id: str,
+    document_id: str,
+    user: CurrentUserDependency,
+    evidence_service: EvidenceServiceDependency,
+) -> list[EvidenceView]:
+    try:
+        return evidence_service.list_for_document(
+            user=user,
+            session_id=session_id,
+            document_id=document_id,
+        )
+    except ResourceNotFoundError as exc:
+        raise _http_error(exc) from exc
+    except EvidenceUnavailableError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="evidence_unavailable",
+        ) from exc
