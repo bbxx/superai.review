@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -46,7 +46,7 @@ class EventEnvelope(BaseModel):
     event_id: UUID = Field(default_factory=uuid4)
     schema_version: str = "1"
     session_id: UUID
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     type: str = Field(min_length=1, max_length=120)
     actor: str | None = Field(default=None, max_length=120)
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -56,7 +56,7 @@ class EventEnvelope(BaseModel):
     def timestamp_must_be_utc(cls, value: datetime) -> datetime:
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("event timestamp must be timezone-aware")
-        return value.astimezone(timezone.utc)
+        return value.astimezone(UTC)
 
     @field_validator("payload")
     @classmethod
