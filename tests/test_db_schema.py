@@ -2,11 +2,13 @@ from superai_review.db import models  # noqa: F401
 from superai_review.db.base import Base
 
 
-def test_registered_tables_include_auth_foundation() -> None:
+def test_registered_tables_include_auth_and_documents() -> None:
     assert set(Base.metadata.tables) == {
         "users",
         "invites",
         "review_sessions",
+        "documents",
+        "document_segments",
         "participants",
         "provider_runs",
         "events",
@@ -28,3 +30,10 @@ def test_review_session_requires_owner_foreign_key() -> None:
     assert sessions.c.user_id.nullable is False
     foreign_keys = {fk.target_fullname for fk in sessions.c.user_id.foreign_keys}
     assert foreign_keys == {"users.id"}
+
+
+def test_document_schema_never_persists_pdf_password() -> None:
+    documents = Base.metadata.tables["documents"]
+    assert "password" not in documents.c
+    assert "pdf_password" not in documents.c
+    assert documents.c.storage_key.unique is True
