@@ -123,6 +123,11 @@ class Document(Base):
         cascade="all, delete-orphan",
         order_by="DocumentSegment.ordinal",
     )
+    evidence: Mapped[list["EvidenceRecord"]] = relationship(
+        back_populates="document",
+        cascade="all, delete-orphan",
+        order_by="EvidenceRecord.ordinal",
+    )
 
 
 class DocumentSegment(Base):
@@ -141,6 +146,40 @@ class DocumentSegment(Base):
     text: Mapped[str] = mapped_column(Text)
 
     document: Mapped[Document] = relationship(back_populates="segments")
+    evidence: Mapped[list["EvidenceRecord"]] = relationship(
+        back_populates="segment", cascade="all, delete-orphan"
+    )
+
+
+class EvidenceRecord(Base):
+    __tablename__ = "evidence"
+    __table_args__ = (
+        UniqueConstraint("document_id", "ordinal", name="uq_evidence_document_ordinal"),
+        UniqueConstraint("segment_id", "chunk_index", name="uq_evidence_segment_chunk"),
+    )
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    document_id: Mapped[str] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), index=True
+    )
+    segment_id: Mapped[str] = mapped_column(
+        ForeignKey("document_segments.id", ondelete="CASCADE"), index=True
+    )
+    ordinal: Mapped[int] = mapped_column(Integer)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    start_offset: Mapped[int] = mapped_column(Integer)
+    end_offset: Mapped[int] = mapped_column(Integer)
+    page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    section: Mapped[str] = mapped_column(String(80))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+
+    document: Mapped[Document] = relationship(back_populates="evidence")
+    segment: Mapped[DocumentSegment] = relationship(back_populates="evidence")
+
+    @property
+    def text(self) -> str:
+        return self.segment.text[self.start_offset : self.end_offset]
 
 
 class Participant(Base):
