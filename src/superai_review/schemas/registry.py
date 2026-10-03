@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from superai_review.schemas.model_outputs import (
     CrossReviewOutput,
@@ -29,7 +29,4 @@ def validate_output(schema_name: str, payload: dict[str, Any]) -> BaseModel:
     schema_type = _SCHEMA_TYPES.get(schema_name)
     if schema_type is None:
         raise UnknownOutputSchemaError(f"unknown structured output schema: {schema_name}")
-    try:
-        return schema_type.model_validate(payload)
-    except ValidationError:
-        raise
+    return schema_type.model_validate(payload)
