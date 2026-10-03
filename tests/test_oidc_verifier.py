@@ -5,6 +5,9 @@ import pytest
 
 from superai_review.auth.identity import InvalidIdentityTokenError, OIDCIdentityVerifier
 
+_GOOD_SECRET = "correct-secret-for-tests-at-least-32-bytes-long"
+_BAD_SECRET = "incorrect-secret-for-tests-at-least-32-bytes"
+
 
 class _SigningKey:
     def __init__(self, key: str) -> None:
@@ -50,7 +53,7 @@ def verifier(secret: str) -> OIDCIdentityVerifier:
 
 
 def test_oidc_verifier_validates_claims_and_identity() -> None:
-    identity = verifier("secret").verify(token("secret"))
+    identity = verifier(_GOOD_SECRET).verify(token(_GOOD_SECRET))
 
     assert identity.subject == "subject-1"
     assert identity.email == "person@example.com"
@@ -59,9 +62,9 @@ def test_oidc_verifier_validates_claims_and_identity() -> None:
 
 def test_oidc_verifier_rejects_unverified_email() -> None:
     with pytest.raises(InvalidIdentityTokenError):
-        verifier("secret").verify(token("secret", email_verified=False))
+        verifier(_GOOD_SECRET).verify(token(_GOOD_SECRET, email_verified=False))
 
 
 def test_oidc_verifier_rejects_bad_signature() -> None:
     with pytest.raises(InvalidIdentityTokenError):
-        verifier("right-secret").verify(token("wrong-secret"))
+        verifier(_GOOD_SECRET).verify(token(_BAD_SECRET))
