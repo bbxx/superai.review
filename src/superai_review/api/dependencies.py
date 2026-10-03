@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -32,13 +33,23 @@ def get_db() -> Generator[Session, None, None]:
         yield db
 
 
+DbDependency = Annotated[Session, Depends(get_db)]
+
+
 def get_identity_verifier(request: Request) -> IdentityVerifier:
     return request.app.state.identity_verifier
 
 
+CredentialsDependency = Annotated[
+    HTTPAuthorizationCredentials | None,
+    Depends(_bearer),
+]
+VerifierDependency = Annotated[IdentityVerifier, Depends(get_identity_verifier)]
+
+
 def get_identity(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    verifier: IdentityVerifier = Depends(get_identity_verifier),
+    credentials: CredentialsDependency,
+    verifier: VerifierDependency,
 ) -> Identity:
     if credentials is None:
         raise HTTPException(
@@ -61,9 +72,12 @@ def get_identity(
         ) from exc
 
 
+IdentityDependency = Annotated[Identity, Depends(get_identity)]
+
+
 def get_current_user(
-    identity: Identity = Depends(get_identity),
-    db: Session = Depends(get_db),
+    identity: IdentityDependency,
+    db: DbDependency,
 ) -> User:
     service = AuthService(db, get_auth_settings().bootstrap_admin_email_set)
     try:
@@ -76,7 +90,13 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="identity conflict") from exc
 
 
-def get_current_admin(user: User = Depends(get_current_user)) -> User:
+CurrentUserDependency = Annotated[User, Depends(get_current_user)]
+
+
+def get_current_admin(user: CurrentUserDependency) -> User:
     if user.role != UserRole.ADMIN.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="admin role required")
     return user
+
+
+CurrentAdminDependency = Annotated[User, Depends(get_current_admin)]
