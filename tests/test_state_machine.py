@@ -1,3 +1,5 @@
+from itertools import pairwise
+
 import pytest
 
 from superai_review.domain.states import (
@@ -20,7 +22,7 @@ def test_happy_path_accepts_canonical_transitions() -> None:
         ReviewState.SYNTHESIZING,
         ReviewState.COMPLETED,
     ]
-    for current, target in zip(path, path[1:]):
+    for current, target in pairwise(path):
         validate_transition(current, target)
 
 
