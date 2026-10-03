@@ -26,14 +26,17 @@ def request() -> ProviderRequest:
     )
 
 
-def test_success_is_deterministic() -> None:
+def test_success_is_deterministic_and_implements_full_contract() -> None:
     provider = FakeProvider(FakeScenario.SUCCESS)
     result = asyncio.run(provider.run(request()))
 
     assert result.provider == "fake"
     assert result.model == "fake-v1"
-    assert result.output["position"] == "supports-default"
+    assert result.output["key_claims"] == ["supports-default"]
     assert result.latency_ms == 7
+    assert provider.capabilities.supports_structured_output is True
+    assert provider.capabilities.max_context_tokens == 32768
+    assert provider.estimate_cost(request()).estimated_total == 0
 
 
 @pytest.mark.parametrize(
@@ -66,7 +69,7 @@ def test_retry_then_success_uses_same_logical_request() -> None:
 def test_contradictory_scenario_is_explicit() -> None:
     provider = FakeProvider(FakeScenario.CONTRADICTORY)
     result = asyncio.run(provider.run(request()))
-    assert result.output["position"] == "contradicts-default"
+    assert result.output["key_claims"] == ["contradicts-default"]
 
 
 def test_cancelled_request_does_not_complete() -> None:
