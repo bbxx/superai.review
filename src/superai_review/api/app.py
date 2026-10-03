@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from superai_review import __version__
 from superai_review.api.auth_routes import router as auth_router
+from superai_review.api.document_routes import router as document_router
 from superai_review.auth.config import AuthSettings, get_auth_settings
 from superai_review.auth.identity import (
     DisabledIdentityVerifier,
@@ -32,6 +33,7 @@ def create_app(identity_verifier: IdentityVerifier | None = None) -> FastAPI:
         get_auth_settings()
     )
     application.include_router(auth_router)
+    application.include_router(document_router)
 
     @application.get("/")
     def root() -> dict[str, str]:
