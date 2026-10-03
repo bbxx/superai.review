@@ -1,23 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, status
 
-from superai_review.api.dependencies import get_current_admin, get_current_user, get_db
+from superai_review.api.dependencies import (
+    CurrentAdminDependency,
+    CurrentUserDependency,
+    DbDependency,
+)
 from superai_review.auth.schemas import InviteCreate, InviteView, UserView
 from superai_review.auth.service import AuthService, InviteAlreadyExistsError
-from superai_review.db.models import User
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
 @router.get("/me", response_model=UserView)
-def me(user: User = Depends(get_current_user)) -> UserView:
+def me(user: CurrentUserDependency) -> UserView:
     return UserView.from_model(user)
 
 
 @router.get("/admin/users", response_model=list[UserView])
 def list_users(
-    _: User = Depends(get_current_admin),
-    db: Session = Depends(get_db),
+    _: CurrentAdminDependency,
+    db: DbDependency,
 ) -> list[UserView]:
     return [UserView.from_model(user) for user in AuthService(db).list_users()]
 
@@ -25,8 +27,8 @@ def list_users(
 @router.post("/admin/invites", response_model=InviteView, status_code=status.HTTP_201_CREATED)
 def create_invite(
     payload: InviteCreate,
-    admin: User = Depends(get_current_admin),
-    db: Session = Depends(get_db),
+    admin: CurrentAdminDependency,
+    db: DbDependency,
 ) -> InviteView:
     try:
         invite = AuthService(db).create_invite(
@@ -41,8 +43,8 @@ def create_invite(
 
 @router.get("/admin/invites", response_model=list[InviteView])
 def list_invites(
-    _: User = Depends(get_current_admin),
-    db: Session = Depends(get_db),
+    _: CurrentAdminDependency,
+    db: DbDependency,
 ) -> list[InviteView]:
     return [InviteView.from_model(invite) for invite in AuthService(db).list_invites()]
 
@@ -50,8 +52,8 @@ def list_invites(
 @router.post("/admin/users/{user_id}/disable", response_model=UserView)
 def disable_user(
     user_id: str,
-    admin: User = Depends(get_current_admin),
-    db: Session = Depends(get_db),
+    admin: CurrentAdminDependency,
+    db: DbDependency,
 ) -> UserView:
     if user_id == admin.id:
         raise HTTPException(
