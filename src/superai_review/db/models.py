@@ -2,7 +2,17 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from superai_review.db.base import Base
@@ -17,11 +27,47 @@ def _utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+class User(Base):
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("issuer", "subject", name="uq_users_issuer_subject"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    issuer: Mapped[str] = mapped_column(String(500))
+    subject: Mapped[str] = mapped_column(String(500))
+    email: Mapped[str] = mapped_column(String(320))
+    email_normalized: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    display_name: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    role: Mapped[str] = mapped_column(String(32), default="user")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    sessions: Mapped[list["ReviewSession"]] = relationship(back_populates="owner")
+
+
+class Invite(Base):
+    __tablename__ = "invites"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    email_normalized: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(32), default="user")
+    invited_by_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    used_by_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ReviewSession(Base):
     __tablename__ = "review_sessions"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    user_id: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
     title: Mapped[str | None] = mapped_column(String(240), nullable=True)
     objective: Mapped[str] = mapped_column(Text, default="")
     constraints: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -35,6 +81,7 @@ class ReviewSession(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    owner: Mapped[User] = relationship(back_populates="sessions")
     participants: Mapped[list["Participant"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
